@@ -1,15 +1,16 @@
-from flask import Flask,jsonify,request
-from flask_restful import Resource, Api, reqparse
+from flask import Flask, request
+from flask_restful import Resource, Api
 from loan_controllers import LoanOperations
 import json
 from pymongo import MongoClient
 
 app = Flask(__name__)
 api = Api(app)
-client = MongoClient('mongodb://localhost:27017/')
-loans = client['loans']
-books = client['books']
-controller = LoanOperations(loans,books)
+connection_string = "mongodb+srv://mizrotem25:4ex1vZPjxUagPfmE@cluster0.htbduca.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+client = MongoClient(connection_string)
+db  = client['loans_database']
+loan_collection = db['loans']
+controller = LoanOperations(loan_collection)
 
 class Loans(Resource):
     def post(self):

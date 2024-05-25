@@ -4,9 +4,8 @@ from pymongo import MongoClient
 
 class LoanOperations:
 
-    def __init__(self , loanDB, booksDB):
+    def __init__(self , loanDB):
         self.loan_collection = loanDB
-        self.book_collection = booksDB
         self.id = 1  # Books ID
 
     def create_loan(self, data):
@@ -14,13 +13,10 @@ class LoanOperations:
         memberName = data['memberName']
         isbn = data['ISBN']
         loanDate = data['loanDate']
-        book_params = {
-            'ISBN': isbn
-        }
         # Check validity: Missing fields, Wrong ISBN, Too much loans
-        book_data = self.get_from_books({'ISBN': isbn})
+        book_data,error_code = self.get_from_books({'ISBN': isbn})
         print(book_data)
-        if not book_data:
+        if error_code != 200 or len(book_data) == 0:
             error_message = f"Sorry {memberName}, the ISBN is not in the library"
             return error_message, 422
 
@@ -33,19 +29,26 @@ class LoanOperations:
         if loan_exists:
             error_message = f"Sorry {memberName}, the book is already on loan"
             return error_message, 422
-        # Enter data into the new loan
 
+        # Enter data into the new loan
         new_loan = {
             'title': book_data[0]['title'],
             'ISBN': isbn,
             'bookID': book_data[0]['id'],
-            'loanID': str(self.id),
+            'loanID': str(self.id),  # You might want to use ObjectId for MongoDB IDs
             'memberName': memberName,
             'loanDate': loanDate
         }
         self.id += 1
         self.loan_collection.insert_one(new_loan)
         return new_loan['loanID'], 201
+    
+    def convert_objectid(self, obj):
+        for item in obj:
+            if '_id' in item:
+                item['_id'] = str(item['_id'])
+        print(obj)
+        return obj
 
     # Function to get all loans
     def get_all_loans(self, query_params=None):
@@ -58,13 +61,14 @@ class LoanOperations:
                 returned_loans = list(self.loan_collection.find({'bookID': {'$in': book_ids}}))
         else:
             returned_loans = list(self.loan_collection.find())
+        returned_loans = self.convert_objectid(returned_loans)
         return returned_loans, 200
 
     # Function to get a single loan by ID
-
     def get_loan_by_id(self, loan_id):
         loan = self.loan_collection.find_one({'loanID': str(loan_id)})
         if loan:
+            loan['_id']= str(loan['_id'])
             return loan, 200
         return None, 404
 
@@ -77,11 +81,19 @@ class LoanOperations:
         return None, 404
 
     def get_from_books(self, query_params=None):
-        query = {}
-        if query_params:
-            query = {key: value for key, value in query_params.items() if value is not None}
+        url = "http://localhost:8000/books"
 
-        books = list(self.books_collection.find(query))
-        if books:
-            return books
-        return []
+        try:
+            if query_params is not None:
+                response = requests.get(url, params=query_params)
+            else:
+                response = requests.get(url)
+
+            response.raise_for_status()
+            books = response.json()
+
+            return books, 200
+
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return {"error": "An error occurred while fetching books"}, 422

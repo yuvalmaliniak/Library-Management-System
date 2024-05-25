@@ -2,14 +2,26 @@ from flask import Flask,jsonify,request
 from flask_restful import Resource, Api, reqparse
 from book_controllers import BookOperations
 import json
+from bson import ObjectId
 from pymongo import MongoClient
 
 app = Flask(__name__)
 api = Api(app)
-client = MongoClient('mongodb://localhost:27017/')
-books = client['books']
-ratings = client['ratings']
-controller = BookOperations(books, ratings)
+connection_string = "mongodb+srv://mizrotem25:4ex1vZPjxUagPfmE@cluster0.htbduca.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+client = MongoClient(connection_string)
+db = client['library_database']
+books_collection = db['books']
+ratings_collection = db['ratings']
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        return json.JSONEncoder.default(self, o)
+
+
+app.json_encoder = JSONEncoder
+controller = BookOperations(books_collection, ratings_collection)
 
 
 
@@ -101,9 +113,9 @@ class Ratings(Resource):
 
 class SingleRating(Resource):
     def get(self,bookid):
-        args = request.get_json()
+        # args = request.get_json()
         try:
-            output, error_code = controller.getRating().get_rating(bookid)
+            output, error_code = controller.ratings.get_rating_by_id(bookid)
             return {"id": output}, error_code
         except json.JSONDecodeError as e:
             return {'error': 'Invalid JSON format'}, 415  # Return JSON with error message and HTTP status code 415 (Bad Request)
@@ -115,7 +127,7 @@ class RatingValues(Resource):
         args = request.get_json()
         try:
             value = args["value"]
-            output, error_code = controller.getRating().add_values_to_ratings(bookid, value)
+            output, error_code = controller.ratings.add_values_to_ratings(bookid, value)
             if error_code == 200:
                 return {"avg": output}, error_code
             else:
@@ -129,7 +141,7 @@ class Top(Resource):
         # Logic to fetch top-rated books or ratings
         #args = request.get_json()
         try:
-            top_sorted_books = controller.getRating().top()
+            top_sorted_books = controller.ratings.top()
             return top_sorted_books, 200
         except json.JSONDecodeError as e:
             return {'error': 'Invalid JSON format'}, 415  # Return JSON with error message and HTTP status code 415 (Bad Request)

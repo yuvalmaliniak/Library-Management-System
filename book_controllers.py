@@ -1,4 +1,5 @@
 import datetime
+from flask import jsonify
 import requests
 from pymongo import MongoClient
 
@@ -110,7 +111,13 @@ class BookOperations:
             return error_message, 500
         return google_params, 200
 
-
+    def convert_objectid(self, obj):
+        for item in obj:
+            if '_id' in item:
+                item['_id'] = str(item['_id'])
+        print(obj)
+        return obj
+    
 
     # Function to get all books
     def get_all_books(self,query_dict=None):
@@ -120,13 +127,16 @@ class BookOperations:
             returned_books = list(self.book_data.find(query_dict))
         else:
             returned_books = list(self.book_data.find())
+        print(returned_books)
+        returned_books = self.convert_objectid(returned_books)
         return returned_books, 200
 
     # Function to get a single book by ID
 
     def get_book_by_id(self,book_id):
-        book = self.book_data.find_one({'_id': book_id})
+        book = self.book_data.find_one({'id': str(book_id)})
         if book:
+            book['_id'] = str(book['_id'])
             return book, 200
         return None, 404
 
@@ -142,14 +152,14 @@ class BookOperations:
                 # Check the validity of genre
                 if data[key] not in genre_values:
                     return "genre is not one of the accepted values", 422
-        result = self.book_data.update_one({'_id': book_id}, {'$set': data})
+        result = self.book_data.update_one({'id': str(book_id)}, {'$set': data})
         if result.matched_count == 0:
             return "No such book with the given ID", 404
         return book_id, 200
 
     # Function to delete a book by ID
     def delete_book(self, book_id):
-        result = self.book_data.delete_one({'_id': book_id})
+        result = self.book_data.delete_one({'id': str(book_id)})
         if result.deleted_count == 1:
             self.ratings.deleteratings(book_id)
             return book_id, 200
@@ -174,39 +184,49 @@ class Ratings:
         self.ratings_data.insert_one(new_rating_entry)
 
     def add_values_to_ratings(self, book_id, value):
-        book_rating = self.ratings_data.find_one({'book_id': book_id})
+        book_rating = self.ratings_data.find_one({'id': str(book_id)})
+        print(book_rating)
         if not book_rating:
             return "Book not found", 404
 
         self.ratings_data.update_one(
-            {'book_id': book_id},
+            {'id': str(book_id)},
             {'$push': {'values': value}}
         )
-        book_rating = self.ratings_data.find_one({'book_id': book_id})
+        book_rating = self.ratings_data.find_one({'id': str(book_id)})
         average = sum(book_rating['values']) / len(book_rating['values'])
         self.ratings_data.update_one(
-            {'book_id': book_id},
+            {'id': str(book_id)},
             {'$set': {'average': average}}
         )
         return average, 200
 
     def deleteratings(self, book_id):
-        self.ratings_data.delete_one({'book_id': book_id})
+        self.ratings_data.delete_one({'id': str(book_id)})
 
     def get_rating_by_id(self,bookid):
-        rating = self.ratings_data.find_one({'book_id': bookid})
+        rating = self.ratings_data.find_one({'id': str(bookid)})
+
         if rating:
+            rating['_id'] = str(rating['_id'])
             return rating, 200
         return {}, 200
 
+    def convert_objectid(self, obj):
+        for item in obj:
+            if '_id' in item:
+                item['_id'] = str(item['_id'])
+        print(obj)
+        return obj
+
     def get_all_ratings(self):
         ratings = list(self.ratings_data.find())
+        ratings = self.convert_objectid(ratings)
         return ratings, 200
 
     def top(self):
         # Find all documents with at least 3 values
-        eligible_books = list(self.ratings_data.find({'values': {'$size': {'$gte': 3}}}))
-
+        eligible_books = list(self.ratings_data.find({'$expr': {'$gte': [{'$size': '$values'}, 3]}}))
         # If there are no eligible books, return an empty list
         if not eligible_books:
             return []
@@ -219,7 +239,7 @@ class Ratings:
 
         # Find all books that have an average score in the top 3 averages
         top_books = [
-            {'book_id': rating['book_id'], 'title': rating['title'], 'average': rating['average']}
+            {'id': rating['id'], 'title': rating['title'], 'average': rating['average']}
             for rating in eligible_books if rating['average'] in top_averages
         ]
 
