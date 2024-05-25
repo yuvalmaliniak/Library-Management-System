@@ -6,7 +6,22 @@ class LoanOperations:
 
     def __init__(self , loanDB):
         self.loan_collection = loanDB
-        self.id = 1  # Books ID
+        self.id = self.get_highest_id()  # Books ID
+
+    def get_highest_id(self):
+        # Check if the collection is empty
+        if self.loan_collection.count_documents({}) == 0:
+            return 1
+        
+        # Retrieve all documents
+        all_documents = self.loan_collection.find()
+        # Convert the id field to an integer and find the highest id
+        highest_id = 0
+        for doc in all_documents: 
+                current_id = int(doc['loanID'])
+                if current_id > highest_id:
+                    highest_id = current_id
+        return highest_id+1
 
     def create_loan(self, data):
         # Extract required data from the POST request

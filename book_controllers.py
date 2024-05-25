@@ -6,12 +6,29 @@ from pymongo import MongoClient
 genre_values = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
 
 
+
 class BookOperations:
 
     def __init__(self,books,ratings_db):
         self.book_data = books
-        self.id = 1  # Books ID
+        self.id = self.get_highest_id()  # Books ID
         self.ratings = Ratings(ratings_db)
+
+
+    def get_highest_id(self):
+        # Check if the collection is empty
+        if self.book_data.count_documents({}) == 0:
+            return 1
+        
+        # Retrieve all documents
+        all_documents = self.book_data.find()
+        # Convert the id field to an integer and find the highest id
+        highest_id = 0
+        for doc in all_documents: 
+                current_id = int(doc['id'])
+                if current_id > highest_id:
+                    highest_id = current_id
+        return highest_id+1
 
     def create_book(self, data):
         # Check validity: Missing fields, existing ID, existing ISBN
@@ -201,8 +218,8 @@ class Ratings:
         )
         return average, 200
 
-    def deleteratings(self, book_id):
-        self.ratings_data.delete_one({'id': str(book_id)})
+    def deleteratings(self, bookid):
+        self.ratings_data.delete_one({'id': str(bookid)})
 
     def get_rating_by_id(self,bookid):
         rating = self.ratings_data.find_one({'id': str(bookid)})
