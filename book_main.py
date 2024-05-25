@@ -2,10 +2,15 @@ from flask import Flask,jsonify,request
 from flask_restful import Resource, Api, reqparse
 from book_controllers import BookOperations
 import json
+from pymongo import MongoClient
 
 app = Flask(__name__)
 api = Api(app)
-controller = BookOperations()
+client = MongoClient('mongodb://localhost:27017/')
+books = client['books']
+ratings = client['ratings']
+controller = BookOperations(books, ratings)
+
 
 
 class Books(Resource):

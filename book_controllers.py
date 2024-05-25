@@ -1,15 +1,16 @@
 import datetime
 import requests
+from pymongo import MongoClient
 
 genre_values = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
 
 
 class BookOperations:
-    books_data = []  # Temporary data storage (list of dictionaries)
 
-    def __init__(self):
+    def __init__(self,books,ratings_db):
+        self.book_data = books
         self.id = 1  # Books ID
-        self.ratings = Ratings()
+        self.ratings = Ratings(ratings_db)
 
     def create_book(self, data):
         # Check validity: Missing fields, existing ID, existing ISBN
@@ -19,10 +20,10 @@ class BookOperations:
         if None in (data['title'], data['ISBN'], data['genre']):
             error_message = "Missing fields"
             return error_message, 422
-        for book in self.books_data:
-            if book['ISBN'] == data['ISBN']:
-                error_message = "There already exists a book in /book with this ISBN number"
-                return error_message, 422
+        existing_book = self.book_data.find_one({'ISBN': data['ISBN']})
+        if existing_book:
+            error_message = "There already exists a book in /book with this ISBN number"
+            return error_message, 422
                 
         # Extract required data from the POST request
         genre = data['genre']
@@ -37,7 +38,7 @@ class BookOperations:
             'genre': data['genre'],
             'id': str(self.id)
         }
-        self.id+=1
+        self.id += 1
         # Handle Google API part
         google_books_data, error_code = self.googleapi(isbn)
         # Check if the call to Google went smooth
@@ -54,7 +55,7 @@ class BookOperations:
             new_book['authors'] = author
         else:
             return google_books_data, error_code
-        self.books_data.append(new_book)
+        self.book_data.insert_one(new_book)
         self.ratings.create_rating_data(self.id-1, new_book['title'])
         return new_book['id'], 201
 
@@ -116,19 +117,17 @@ class BookOperations:
         returned_books = []
         if query_dict:
             # Handle all query params. The check for validity is being done in main
-            for book in self.books_data:
-                if all(book.get(query) == value for query, value in query_dict.items()):
-                    returned_books.append(book)
+            returned_books = list(self.book_data.find(query_dict))
         else:
-            returned_books = self.books_data
+            returned_books = list(self.book_data.find())
         return returned_books, 200
 
     # Function to get a single book by ID
 
     def get_book_by_id(self,book_id):
-        for book in self.books_data:
-            if book['id'] == str(book_id):
-                return book, 200
+        book = self.book_data.find_one({'_id': book_id})
+        if book:
+            return book, 200
         return None, 404
 
     # Function to update a book by ID
@@ -143,35 +142,26 @@ class BookOperations:
                 # Check the validity of genre
                 if data[key] not in genre_values:
                     return "genre is not one of the accepted values", 422
-        index = 0
-        # Extract the book id if exists. If not, return 404 error code.
-        for book in self.books_data:
-            if book['id'] == str(book_id):
-                break
-            index += 1
-        if index >= len(self.books_data):
+        result = self.book_data.update_one({'_id': book_id}, {'$set': data})
+        if result.matched_count == 0:
             return "No such book with the given ID", 404
-        for key in all_keys:
-            # Update the book in the DB
-            self.books_data[index][key] = data[key]
         return book_id, 200
 
     # Function to delete a book by ID
     def delete_book(self, book_id):
-        for i, book in enumerate(self.books_data):
-            if book['id'] == str(book_id):
-                del self.books_data[i]
-                self.ratings.deleteratings(book['id'])
-                return book_id, 200
-        # No book found, return 404 error code
+        result = self.book_data.delete_one({'_id': book_id})
+        if result.deleted_count == 1:
+            self.ratings.deleteratings(book_id)
+            return book_id, 200
         return None, 404
+
     def getRating(self):
         return self.ratings
 
 
 class Ratings:
-    def __init__(self):
-        self.ratings_data = []
+    def __init__(self, ratings_db):
+        self.ratings_data = ratings_db
 
     def create_rating_data(self,id,title):
         values = []
@@ -181,54 +171,59 @@ class Ratings:
             'title': title,
             'id': str(id)
         }
-        self.ratings_data.append(new_rating_entry)
+        self.ratings_data.insert_one(new_rating_entry)
 
-    def add_values_to_ratings(self,id,value):
-        index = False
-        avg=0
-        for bookrating in self.ratings_data:
-            # Find the id in the rating DB and add the value to the values array.
-            if bookrating['id'] == str(id):
-                bookrating['values'].append(value)
-                count = 0
-                index = True
-                for value in bookrating['values']:
-                    count += value
-                avg = count/len(bookrating['values'])
-                bookrating['average'] = avg
-        if index:
-            # We added value, so return the avg
-            return avg, 200
-        else:
+    def add_values_to_ratings(self, book_id, value):
+        book_rating = self.ratings_data.find_one({'book_id': book_id})
+        if not book_rating:
             return "Book not found", 404
 
+        self.ratings_data.update_one(
+            {'book_id': book_id},
+            {'$push': {'values': value}}
+        )
+        book_rating = self.ratings_data.find_one({'book_id': book_id})
+        average = sum(book_rating['values']) / len(book_rating['values'])
+        self.ratings_data.update_one(
+            {'book_id': book_id},
+            {'$set': {'average': average}}
+        )
+        return average, 200
+
     def deleteratings(self, book_id):
-        for i, rating in enumerate(self.ratings_data):
-            if rating['id'] == book_id or str(rating['id']) == book_id:
-                del self.ratings_data[i]
-                return
+        self.ratings_data.delete_one({'book_id': book_id})
+
     def get_rating_by_id(self,bookid):
-        for rating in self.ratings_data:
-            if rating['id'] == str(bookid):
-                return rating, 200
-        return {}, 200  # No Book with given id
+        rating = self.ratings_data.find_one({'book_id': bookid})
+        if rating:
+            return rating, 200
+        return {}, 200
 
     def get_all_ratings(self):
-        return self.ratings_data, 200
+        ratings = list(self.ratings_data.find())
+        return ratings, 200
 
     def top(self):
-        # Extract all scores with more than 3 values
-        book_averages = [rating['average'] for rating in self.ratings_data if len(rating['values']) >= 3]
+        # Find all documents with at least 3 values
+        eligible_books = list(self.ratings_data.find({'values': {'$size': {'$gte': 3}}}))
 
-        # Find the top 3 unique scores
-        top_scores = sorted(set(book_averages), reverse=True)[:3]
+        # If there are no eligible books, return an empty list
+        if not eligible_books:
+            return []
 
-        # Filter books that have top scores
+        # Extract all unique average scores
+        unique_averages = sorted(set([book['average'] for book in eligible_books]), reverse=True)
+
+        # Get the top 3 unique average scores
+        top_averages = unique_averages[:3]
+
+        # Find all books that have an average score in the top 3 averages
         top_books = [
-            {'id': rating['id'], 'title': rating['title'], 'average': rating['average']}
-            for rating in self.ratings_data if rating['average'] in top_scores and len(rating['values']) >= 3
+            {'book_id': rating['book_id'], 'title': rating['title'], 'average': rating['average']}
+            for rating in eligible_books if rating['average'] in top_averages
         ]
 
-        # Sort books by average descending
+        # Sort top books by average score in descending order
         top_books_sorted = sorted(top_books, key=lambda x: x['average'], reverse=True)
+
         return top_books_sorted

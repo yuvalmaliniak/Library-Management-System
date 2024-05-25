@@ -1,13 +1,16 @@
 import datetime
 import requests
+from pymongo import MongoClient
+
+
 
 genre_values = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
 
 
 class LoanOperations:
-    loan_data = []  # Temporary data storage (list of dictionaries)
 
-    def __init__(self):
+    def __init__(self , db):
+        self.loan_collection = db['loans']
         self.id = 1  # Books ID
 
     def create_loan(self, data):
@@ -25,15 +28,14 @@ class LoanOperations:
             error_message = f"Sorry {memberName},  the ISBN is not in the library"
             return error_message, 422
 
-        num_of_loans = 0
-        for loan in self.loan_data:
-            if loan['ISBN'] == isbn:
-                error_message = f"Sorry {memberName}, The book is already on loan"
-                return error_message, 422
-            if loan['memberName'] == memberName:
-                num_of_loans += 1
+        num_of_loans = self.loan_collection.count_documents({'memberName': memberName})
         if num_of_loans >= 2:
-            error_message = f"Sorry {memberName},  You already have 2 or more books on loan"
+            error_message = f"Sorry {memberName}, you already have 2 or more books on loan"
+            return error_message, 422
+
+        loan_exists = self.loan_collection.find_one({'ISBN': isbn})
+        if loan_exists:
+            error_message = f"Sorry {memberName}, the book is already on loan"
             return error_message, 422
         # Enter data into the new loan
 
@@ -46,7 +48,7 @@ class LoanOperations:
             'loanDate': loanDate
         }
         self.id += 1
-        self.loan_data.append(new_loan)
+        self.loan_collection.insert_one(new_loan)
         return new_loan['loanID'], 201
 
     # Function to get all loans
@@ -57,28 +59,26 @@ class LoanOperations:
             if error_code == 200:
                 book_ids = [book['id'] for book in books]
                 print(book_ids)
-                returned_loans = [loan for loan in self.loan_data if loan['loanID'] in book_ids]
+                returned_loans = list(self.loan_collection.find({'bookID': {'$in': book_ids}}))
         else:
-            returned_loans = self.loan_data
+            returned_loans = list(self.loan_collection.find())
         return returned_loans, 200
 
     # Function to get a single loan by ID
 
     def get_loan_by_id(self, loan_id):
-        for loan in self.loan_data:
-            if loan['loanID'] == str(loan_id):
-                return loan, 200
+        loan = self.loan_collection.find_one({'loanID': str(loan_id)})
+        if loan:
+            return loan, 200
         return None, 404
 
     # Function to get a single book by ID
 
     # Function to delete a book by ID
     def delete_loan(self, loan_id):
-        for i, loan in enumerate(self.loan_data):
-            if loan['loanID'] == str(loan_id):
-                del self.loan_data[i]
-                return loan['loanID'], 200
-        # No book found, return 404 error code
+        result = self.loan_collection.delete_one({'loanID': str(loan_id)})
+        if result.deleted_count == 1:
+            return loan_id, 200
         return None, 404
 
     def get_from_books(self, query_params=None):
