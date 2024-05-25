@@ -64,7 +64,7 @@ class loanID(Resource):
 api.add_resource(Loans, '/loans')
 api.add_resource(loanID, '/loans/<int:loanID>')
 
-if __name__ == '__loan_main__':
+if __name__ == '__main__':
     # Define the API routes using Flask
     app.run(host='0.0.0.0', port=8001, debug=True)
 

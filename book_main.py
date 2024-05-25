@@ -136,7 +136,7 @@ api.add_resource(SingleRating, '/ratings/<int:bookid>')
 api.add_resource(RatingValues, '/ratings/<int:bookid>/values')
 api.add_resource(Top, '/top')
 
-if __name__ == '__book_main__':
+if __name__ == '__main__':
     # Define the API routes using Flask
     app.run(host='0.0.0.0', port=8000, debug=True)
 
