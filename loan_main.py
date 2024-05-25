@@ -1,14 +1,14 @@
 from flask import Flask,jsonify,request
 from flask_restful import Resource, Api, reqparse
-from book_controllers import BookOperations
+from loan_controllers import LoanOperations
 import json
 
 app = Flask(__name__)
 api = Api(app)
-controller = BookOperations()
+controller = LoanOperations()
 
 
-class Books(Resource):
+class Loans(Resource):
     def post(self):
         # Check if the request is json. If not, return error 415 with relevant error message
         if not request.is_json or request.headers['Content-Type'] != 'application/json':
@@ -16,19 +16,19 @@ class Books(Resource):
         args = request.get_json()
         try:
             # Handle the POST request
-            desired_keys = ["title", "ISBN", "genre"]
+            desired_keys = ["memberName", "ISBN", "loanDate"]
             for key in desired_keys:
                 if key not in args:
                     return {"error": "Missing required parameter"}, 422
-            title = args["title"]
+            memberName = args["memberName"]
             isbn = args["ISBN"]
-            genre = args["genre"]
+            loanDate = args["loanDate"]
             post_data = {
-                "title": title,
+                "memberName": memberName,
                 "ISBN": isbn,
-                "genre": genre
+                "loanDate": loanDate
             }
-            output, error_code = controller.create_book(post_data)
+            output, error_code = controller.create_loan(post_data)
             if error_code == 201:
                 return {"id": output}, error_code
             else:

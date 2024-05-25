@@ -1,5 +1,4 @@
 import datetime
-import google.generativeai as genai
 import requests
 
 genre_values = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
