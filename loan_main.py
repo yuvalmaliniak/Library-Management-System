@@ -4,13 +4,12 @@ from loan_controllers import LoanOperations
 import json
 from pymongo import MongoClient
 
-
 app = Flask(__name__)
 api = Api(app)
 client = MongoClient('mongodb://localhost:27017/')
-db = client['loans']
-controller = LoanOperations(db)
-
+loans = client['loans']
+books = client['books']
+controller = LoanOperations(loans,books)
 
 class Loans(Resource):
     def post(self):
@@ -34,7 +33,7 @@ class Loans(Resource):
             }
             output, error_code = controller.create_loan(post_data)
             if error_code == 201:
-                return {"id": output}, error_code
+                return {"loanID": output}, error_code
             else:
                 return {"error": output}, error_code
         except json.JSONDecodeError as e:

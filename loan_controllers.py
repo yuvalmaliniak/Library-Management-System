@@ -2,15 +2,11 @@ import datetime
 import requests
 from pymongo import MongoClient
 
-
-
-genre_values = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
-
-
 class LoanOperations:
 
-    def __init__(self , db):
-        self.loan_collection = db['loans']
+    def __init__(self , loanDB, booksDB):
+        self.loan_collection = loanDB
+        self.book_collection = booksDB
         self.id = 1  # Books ID
 
     def create_loan(self, data):
@@ -22,10 +18,10 @@ class LoanOperations:
             'ISBN': isbn
         }
         # Check validity: Missing fields, Wrong ISBN, Too much loans
-        book_data, error_code = self.get_from_books(book_params)
+        book_data = self.get_from_books({'ISBN': isbn})
         print(book_data)
-        if error_code != 200 or len(book_data) == 0:
-            error_message = f"Sorry {memberName},  the ISBN is not in the library"
+        if not book_data:
+            error_message = f"Sorry {memberName}, the ISBN is not in the library"
             return error_message, 422
 
         num_of_loans = self.loan_collection.count_documents({'memberName': memberName})
@@ -72,9 +68,8 @@ class LoanOperations:
             return loan, 200
         return None, 404
 
-    # Function to get a single book by ID
 
-    # Function to delete a book by ID
+    # Function to delete a loan by ID
     def delete_loan(self, loan_id):
         result = self.loan_collection.delete_one({'loanID': str(loan_id)})
         if result.deleted_count == 1:
@@ -82,19 +77,11 @@ class LoanOperations:
         return None, 404
 
     def get_from_books(self, query_params=None):
-        url = "http://localhost:8000/books"
+        query = {}
+        if query_params:
+            query = {key: value for key, value in query_params.items() if value is not None}
 
-        try:
-            if query_params is not None:
-                response = requests.get(url, params=query_params)
-            else:
-                response = requests.get(url)
-
-            response.raise_for_status()
-            books = response.json()
-
-            return books, 200
-
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred: {e}")
-            return {"error": "An error occurred while fetching books"}, 422
+        books = list(self.books_collection.find(query))
+        if books:
+            return books
+        return []
