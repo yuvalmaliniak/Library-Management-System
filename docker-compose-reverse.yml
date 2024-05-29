@@ -1,0 +1,73 @@
+version: '3'
+services:
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
+    restart: always
+    networks:
+      - backend
+  booksrv:
+    build: ./books
+    depends_on:
+      - mongo
+    ports:
+      - "5001:8000"
+    expose:
+      - 8000
+    volumes:
+      - type: bind
+        source: ./books
+        target: /app
+    restart: always
+    networks:
+      - backend
+
+  loansrv:
+    build: ./loans
+    depends_on:
+      - mongo
+      - booksrv
+    ports:
+      - "5002:8001"
+    expose:
+      - 8001
+    volumes:
+      - type: bind
+        source: ./loans
+        target: /app
+    restart: always
+    networks:
+      - backend
+
+  loansrv2:
+    build: ./loans
+    depends_on:
+      - mongo
+      - booksrv
+    ports:
+      - "5003:8001"
+    expose:
+      - 8001
+    volumes:
+      - type: bind
+        source: ./loans
+        target: /app
+    restart: always
+    networks:
+      - backend
+
+  nginx:
+    build: ./reverse_nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - loansrv
+      - loansrv2
+      - booksrv
+    restart: always
+    networks:
+      - backend
+networks:
+  backend:
+    driver: bridge
