@@ -1,12 +1,13 @@
-**Library Management System**
+# Library Management System
 
-Welcome to the Library Management System! 
+### Welcome to the Library Management System! 
+
 This project leverages Docker and NGINX to create a microservices architecture for managing books and loans within a library. 
 The repository includes a docker-compose-reverse.yaml file to set up the environment quickly.
 
-**Overview**
+## Overview
 
-This system is composed of several microservices:
+#### This system is composed of several microservices:
 
 
 
@@ -19,36 +20,34 @@ This system is composed of several microservices:
 **NGINX**: Reverse proxy to route requests to appropriate services.
 
 
-**Setup**
-
-*Copy code*
-
+## Setup
+#### The following command will spin up all the containers defined in the docker-compose-reverse.yaml file.
 docker-compose -f docker-compose-reverse.yaml up
 
 
-This will spin up all the containers defined in the docker-compose-reverse.yaml file.
 
-Services and Endpoints
-**Books Service**
+
+## Services and Endpoints
+### Books Service
 Base URL: http://localhost:5001
 
 Endpoints:
-GET /books: Retrieve all books.
-GET /books/{id}: Retrieve a specific book by ID.
-GET /ratings: Retrieve ratings.
-POST /ratings/{id}/values: Add a rating.
+#### GET /books: Retrieve all books.
+#### GET /books/{id}: Retrieve a specific book by ID.
+#### GET /ratings: Retrieve ratings.
+#### POST /ratings/{id}/values: Add a rating.
 
-**Loans Service**
+### Loans Service
 Base URL: http://localhost:5002
 
 Endpoints:
-GET /loans: Retrieve all loans.
+#### GET /loans: Retrieve all loans.
 
 
-NGINX Reverse Proxy
+### NGINX Reverse Proxy
 Base URL: http://localhost:80
 
-Routes:
+#### Routes:
 
 
 Requests to /books, /ratings, and /top are routed to the Books Service.
@@ -57,25 +56,9 @@ Only GET requests are allowed for /books, /ratings, and /loans.
 Only POST requests are allowed for /ratings/{id}/values.
 
 
-**Database**
-MongoDB
-Host Port: 27017
-
-
-**Databases:**
-library: Contains collections books, ratings, and loans.
-
-
-
-
-
-**File Structure**:
-
-
-docker-compose-reverse.yaml: Docker Compose file to set up the environment.
-
-
-Books Container: Contains the books service and related configurations.
+## Database
+#### MongoDB - Host Port: 27017
+#### Contains collections books, ratings, and loans.
 
 
 Loans Container: Contains the loans service and related configurations.
