@@ -68,3 +68,5 @@ MongoDB Container: Contains the MongoDB instance.
 
 
 NGINX Container: Contains the NGINX reverse proxy configurations.
+
+Optional: Add summary for each book using Gemini API, contact me for additional info regarding the setup. 
